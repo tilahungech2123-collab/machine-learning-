@@ -1,0 +1,68 @@
+# Identify categorical columns for encoding (excluding the target variable)
+categorical_features_for_encoding = df.select_dtypes(include='category').columns.tolist()
+if 'satisfaction' in categorical_features_for_encoding:
+    categorical_features_for_encoding.remove('satisfaction')
+
+print("Categorical features to be encoded:", categorical_features_for_encoding)
+print("Number of categorical features to be encoded:", len(categorical_features_for_encoding))
+# Apply One-Hot Encoding to categorical features
+df_encoded = pd.get_dummies(df, columns=categorical_features_for_encoding, drop_first=True)
+
+print("DataFrame shape after One-Hot Encoding:", df_encoded.shape)
+print("First 5 rows of the encoded DataFrame:")
+display(df_encoded.head())
+from sklearn.preprocessing import StandardScaler
+
+# Identify numerical columns (excluding the target variable)
+numerical_cols_for_scaling = df_encoded.select_dtypes(include=['float64', 'int64']).columns.tolist()
+
+if 'satisfaction' in numerical_cols_for_scaling:
+    numerical_cols_for_scaling.remove('satisfaction')
+
+print("Numerical features identified for scaling after split:", numerical_cols_for_scaling)
+
+# Create df_scaled as a clean copy of our encoded features.
+# The actual fit and transformation will now be done safely after the train-test split.
+df_scaled = df_encoded.copy()
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# Separate features (X) and target (y)
+X = df_scaled.drop('satisfaction', axis=1)  # Features
+y = df_scaled['satisfaction']             # Target variable
+
+# Convert target variable to numerical (0 for 'not satisfied', 1 for 'satisfied')
+y = y.map({'not satisfied': 0, 'satisfied': 1})
+
+# 1. Split the data first to prevent data leakage
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# 2. Fit scaler ONLY on the training features, then scale both sets
+scaler = StandardScaler()
+
+# Fit and transform the training features
+X_train[numerical_cols_for_scaling] = scaler.fit_transform(X_train[numerical_cols_for_scaling])
+
+# Transform the test features using the fitted training parameters
+X_test[numerical_cols_for_scaling] = scaler.transform(X_test[numerical_cols_for_scaling])
+
+print("Shape of X_train:", X_train.shape)
+print("Shape of X_test:", X_test.shape)
+print("Shape of y_train:", y_train.shape)
+print("Shape of y_test:", y_test.shape)
+
+print("\nValue counts of y_train:")
+display(y_train.value_counts())
+
+print("\nValue counts of y_test:")
+display(y_test.value_counts())
+from sklearn.linear_model import LogisticRegression
+
+# Initialize the Logistic Regression model
+# Using solver='liblinear' as it works well for small datasets and L1/L2 regularization
+model = LogisticRegression(random_state=42, solver='liblinear')
+
+# Train the model on the training data
+model.fit(X_train, y_train)
+
+print("Logistic Regression model trained successfully.")
